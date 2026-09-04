@@ -1,0 +1,158 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  USER
+  ANALYST
+  ADMIN
+}
+
+enum MailProvider {
+  GMAIL
+  OUTLOOK
+  YAHOO
+}
+
+enum EmailCategory {
+  SAFE
+  MARKETING
+  SPAM
+  PHISHING
+}
+
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum AnalysisStatus {
+  QUEUED
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum AlertStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+}
+
+model User {
+  id           String      @id @default(uuid()) @db.Uuid
+  email        String      @unique
+  passwordHash String?
+  displayName  String
+  role         UserRole    @default(USER)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  mailboxes    Mailbox[]
+  analyses     EmailAnalysis[]
+  alerts       Alert[]
+  auditLogs    AuditLog[]
+
+  @@index([role])
+}
+
+model Mailbox {
+  id           String       @id @default(uuid()) @db.Uuid
+  userId       String       @db.Uuid
+  provider     MailProvider
+  providerUser String
+  tokenRef     String       @unique
+  connectedAt  DateTime     @default(now())
+  lastScannedAt DateTime?
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emails       Email[]
+  scans        Scan[]
+
+  @@unique([userId, provider, providerUser])
+  @@index([userId])
+}
+
+model Email {
+  id             String          @id @default(uuid()) @db.Uuid
+  mailboxId      String          @db.Uuid
+  providerId     String
+  sender         String
+  recipient      String
+  subject        String
+  bodyText       String
+  receivedAt     DateTime
+  createdAt      DateTime        @default(now())
+  mailbox        Mailbox         @relation(fields: [mailboxId], references: [id], onDelete: Cascade)
+  analyses       EmailAnalysis[]
+
+  @@unique([mailboxId, providerId])
+  @@index([mailboxId, receivedAt])
+}
+
+model Scan {
+  id          String       @id @default(uuid()) @db.Uuid
+  mailboxId   String       @db.Uuid
+  status      AnalysisStatus @default(QUEUED)
+  requestedAt DateTime     @default(now())
+  startedAt   DateTime?
+  completedAt DateTime?
+  error       String?
+  mailbox     Mailbox      @relation(fields: [mailboxId], references: [id], onDelete: Cascade)
+  analyses    EmailAnalysis[]
+
+  @@index([mailboxId, requestedAt])
+}
+
+model EmailAnalysis {
+  id          String          @id @default(uuid()) @db.Uuid
+  emailId     String          @db.Uuid
+  scanId      String?         @db.Uuid
+  userId      String          @db.Uuid
+  category    EmailCategory
+  riskLevel   RiskLevel
+  score       Decimal         @db.Decimal(5, 4)
+  reasons     Json
+  modelName   String
+  analyzedAt  DateTime        @default(now())
+  email       Email           @relation(fields: [emailId], references: [id], onDelete: Cascade)
+  scan        Scan?           @relation(fields: [scanId], references: [id], onDelete: SetNull)
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  alerts      Alert[]
+
+  @@index([userId, analyzedAt])
+  @@index([category, riskLevel])
+}
+
+model Alert {
+  id         String        @id @default(uuid()) @db.Uuid
+  userId     String        @db.Uuid
+  analysisId String        @db.Uuid
+  status     AlertStatus   @default(OPEN)
+  title      String
+  createdAt  DateTime      @default(now())
+  resolvedAt DateTime?
+  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  analysis   EmailAnalysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status, createdAt])
+}
+
+model AuditLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String?  @db.Uuid
+  action    String
+  entity    String
+  entityId  String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([userId, createdAt])
+}

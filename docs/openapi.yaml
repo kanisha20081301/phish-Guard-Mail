@@ -1,0 +1,59 @@
+openapi: 3.0.3
+info:
+  title: PhishGuard API
+  version: 1.0.0
+  description: Authenticated email phishing and spam analysis API.
+servers:
+  - url: http://localhost:4000
+paths:
+  /api/health:
+    get:
+      summary: Dependency health
+      responses:
+        '200': { description: Current API, database, and cache status }
+  /api/v1/auth/register:
+    post:
+      summary: Register a user
+      responses:
+        '201': { description: User created }
+  /api/v1/auth/login:
+    post:
+      summary: Create an authenticated session
+      responses:
+        '200': { description: Session cookie created }
+  /api/v1/auth/me:
+    get:
+      summary: Get the current user
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200': { description: Authenticated user }
+  /api/v1/analyses:
+    post:
+      summary: Analyze and persist an email
+      security: [{ cookieAuth: [] }]
+      responses:
+        '201': { description: Analysis and risk result }
+  /api/v1/alerts:
+    get:
+      summary: List owned alerts
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200': { description: Alert list }
+  /api/v1/analyst/summary:
+    get:
+      summary: Threat summary for analysts and admins
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200': { description: Threat totals }
+  /api/v1/admin/users:
+    get:
+      summary: List users for administrators
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200': { description: User list }
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: phishguard_access
